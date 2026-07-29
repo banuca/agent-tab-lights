@@ -1,0 +1,18 @@
+{
+  "manifest_version": 3,
+  "name": "Agent Tab Lights",
+  "version": "0.1.1",
+  "description": "Adds a coloured status dot to ChatGPT tab titles while preserving the ChatGPT favicon.",
+  "content_scripts": [
+    {
+      "matches": [
+        "https://chatgpt.com/*"
+      ],
+      "js": [
+        "chatgpt-detector.js",
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}
