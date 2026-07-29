@@ -4,6 +4,8 @@ Agent Tab Lights adds a coloured status dot to each `chatgpt.com` browser tab
 title while preserving the original ChatGPT favicon. It does not require an
 OpenAI API key.
 
+**Current version: v0.1.1**
+
 ## Status colours
 
 - 🟠 Orange: ChatGPT is working.
@@ -40,7 +42,7 @@ save, or upload chat content.
 
 ## Current scope
 
-Version 0.1 supports `chatgpt.com` only. The detection code is kept separate
+Version 0.1.1 supports `chatgpt.com` only. The detection code is kept separate
 from the tab-colour logic so additional providers, including Codex and Claude,
 can be added later.
 
