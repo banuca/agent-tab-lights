@@ -1,17 +1,77 @@
 {
   "manifest_version": 3,
   "name": "Agent Tab Lights",
-  "version": "0.1.1",
-  "description": "Adds a coloured status dot to ChatGPT tab titles while preserving the ChatGPT favicon.",
+  "version": "0.2.0",
+  "description": "Adds a coloured status dot to ChatGPT, Claude, Claude Code and Codex tab titles while preserving each site's favicon.",
+  "background": {
+    "service_worker": "background.js"
+  },
   "content_scripts": [
     {
       "matches": [
-        "https://chatgpt.com/*"
+        "https://chatgpt.com/*",
+        "https://chat.openai.com/*"
       ],
       "js": [
-        "chatgpt-detector.js",
-        "content.js"
+        "lib/protocol.js",
+        "lib/detector-kit.js",
+        "lib/tab-title.js",
+        "lib/state-machine.js",
+        "lib/watcher.js",
+        "detectors/chatgpt.js",
+        "content-top.js"
       ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://claude.ai/*"
+      ],
+      "js": [
+        "lib/protocol.js",
+        "lib/detector-kit.js",
+        "lib/tab-title.js",
+        "lib/state-machine.js",
+        "lib/watcher.js",
+        "detectors/claude.js",
+        "content-top.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://*.github.dev/*",
+        "https://*.app.github.dev/*",
+        "https://github.com/codespaces/*",
+        "https://vscode.dev/*"
+      ],
+      "js": [
+        "lib/protocol.js",
+        "lib/tab-title.js",
+        "lib/state-machine.js",
+        "content-top.js"
+      ],
+      "all_frames": false,
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://*.github.dev/*",
+        "https://*.app.github.dev/*",
+        "https://*.vscode-cdn.net/*",
+        "https://vscode.dev/*"
+      ],
+      "js": [
+        "lib/protocol.js",
+        "lib/detector-kit.js",
+        "lib/watcher.js",
+        "detectors/claude-code.js",
+        "detectors/codex.js",
+        "detectors/generic-agent.js",
+        "content-frame.js"
+      ],
+      "all_frames": true,
+      "match_origin_as_fallback": true,
       "run_at": "document_idle"
     }
   ]

@@ -2,7 +2,7 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const detector = require("../chatgpt-detector.js");
+const detector = require("../detectors/chatgpt.js");
 
 function fakeElement({
   text = "",
