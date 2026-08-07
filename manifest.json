@@ -1,39 +1,55 @@
 {
   "manifest_version": 3,
   "name": "Agent Tab Lights",
-  "version": "0.2.0",
-  "description": "Adds a coloured status dot to ChatGPT, Claude, Claude Code and Codex tab titles while preserving each site's favicon.",
+  "version": "0.3.0",
+  "description": "Shows a status light in the tab title while ChatGPT, Claude, Gemini and other AI agents work, so you can see when they finish.",
+  "minimum_chrome_version": "119",
+  "permissions": [
+    "storage"
+  ],
   "background": {
     "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "Agent Tab Lights",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
   },
   "content_scripts": [
     {
       "matches": [
         "https://chatgpt.com/*",
-        "https://chat.openai.com/*"
+        "https://chat.openai.com/*",
+        "https://claude.ai/*",
+        "https://gemini.google.com/*",
+        "https://*.perplexity.ai/*",
+        "https://chat.deepseek.com/*",
+        "https://chat.mistral.ai/*"
       ],
       "js": [
         "lib/protocol.js",
+        "lib/settings.js",
         "lib/detector-kit.js",
+        "lib/vocab.js",
         "lib/tab-title.js",
         "lib/state-machine.js",
         "lib/watcher.js",
         "detectors/chatgpt.js",
-        "content-top.js"
-      ],
-      "run_at": "document_idle"
-    },
-    {
-      "matches": [
-        "https://claude.ai/*"
-      ],
-      "js": [
-        "lib/protocol.js",
-        "lib/detector-kit.js",
-        "lib/tab-title.js",
-        "lib/state-machine.js",
-        "lib/watcher.js",
         "detectors/claude.js",
+        "detectors/gemini.js",
+        "detectors/perplexity.js",
+        "detectors/deepseek.js",
+        "detectors/mistral.js",
+        "lib/tab-controller.js",
         "content-top.js"
       ],
       "run_at": "document_idle"
@@ -41,34 +57,25 @@
     {
       "matches": [
         "https://*.github.dev/*",
-        "https://*.app.github.dev/*",
-        "https://github.com/codespaces/*",
-        "https://vscode.dev/*"
-      ],
-      "js": [
-        "lib/protocol.js",
-        "lib/tab-title.js",
-        "lib/state-machine.js",
-        "content-top.js"
-      ],
-      "all_frames": false,
-      "run_at": "document_idle"
-    },
-    {
-      "matches": [
-        "https://*.github.dev/*",
-        "https://*.app.github.dev/*",
         "https://*.vscode-cdn.net/*",
         "https://vscode.dev/*"
       ],
       "js": [
         "lib/protocol.js",
+        "lib/settings.js",
         "lib/detector-kit.js",
+        "lib/vocab.js",
+        "lib/tab-title.js",
+        "lib/state-machine.js",
         "lib/watcher.js",
         "detectors/claude-code.js",
         "detectors/codex.js",
+        "detectors/copilot-chat.js",
         "detectors/generic-agent.js",
-        "content-frame.js"
+        "lib/frame-reporter.js",
+        "lib/tab-controller.js",
+        "content-frame.js",
+        "content-top.js"
       ],
       "all_frames": true,
       "match_origin_as_fallback": true,

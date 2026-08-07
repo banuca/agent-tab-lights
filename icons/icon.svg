@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <!--
+    Design source of truth. The shipped PNGs are generated from the same
+    geometry by tools/generate-icons.mjs (no raster toolchain required); edit
+    both together if you change the design.
+
+    A traffic light, literally: the three dots are the colours the extension
+    actually writes into tab titles.
+  -->
+  <rect width="128" height="128" rx="28" fill="#1E2430"/>
+  <circle cx="64" cy="33" r="14" fill="#F4900C"/>
+  <circle cx="64" cy="64" r="14" fill="#FDCB58"/>
+  <circle cx="64" cy="95" r="14" fill="#78B159"/>
+</svg>

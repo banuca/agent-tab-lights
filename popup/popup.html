@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Agent Tab Lights</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header class="header">
+      <img class="header__icon" src="../icons/icon-32.png" alt="" width="20" height="20" />
+      <h1 class="header__title">Agent Tab Lights</h1>
+      <!--
+        Starts disabled: until the stored settings arrive, a click would save a
+        state derived from the defaults and wipe the user's provider choices.
+      -->
+      <label class="switch" title="Turn all lights on or off">
+        <input type="checkbox" id="global-toggle" checked disabled />
+        <span class="switch__track" aria-hidden="true"></span>
+        <span class="visually-hidden">Enable Agent Tab Lights</span>
+      </label>
+    </header>
+
+    <section class="status" aria-live="polite">
+      <span class="status__dot" id="status-dot" data-state="idle"></span>
+      <div class="status__text">
+        <p class="status__headline" id="status-headline">Checking this tab…</p>
+        <p class="status__detail" id="status-detail"></p>
+      </div>
+    </section>
+
+    <section class="providers">
+      <h2 class="providers__heading">Websites</h2>
+      <ul class="providers__list" id="site-providers"></ul>
+
+      <h2 class="providers__heading">VS Code &amp; Codespaces</h2>
+      <ul class="providers__list" id="panel-providers"></ul>
+    </section>
+
+    <footer class="footer">
+      <span id="version"></span>
+      <a href="https://github.com/banuca/agent-tab-lights" target="_blank" rel="noreferrer">Help</a>
+    </footer>
+
+    <script src="../lib/protocol.js"></script>
+    <script src="../lib/settings.js"></script>
+    <script src="../lib/tab-title.js"></script>
+    <script src="popup.js"></script>
+  </body>
+</html>

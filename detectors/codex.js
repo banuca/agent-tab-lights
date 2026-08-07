@@ -4,8 +4,11 @@
   const kit =
     globalScope.AgentTabLights?.kit ||
     (typeof require === "function" ? require("../lib/detector-kit.js") : null);
+  const vocab =
+    globalScope.AgentTabLights?.vocab ||
+    (typeof require === "function" ? require("../lib/vocab.js") : null);
 
-  if (!kit) {
+  if (!kit || !vocab) {
     return;
   }
 
@@ -14,7 +17,9 @@
     label: "Codex",
     selectors: {
       // See the note in detectors/claude-code.js: this gate is what keeps
-      // unrelated VS Code webviews silent.
+      // unrelated VS Code webviews silent. Deliberately no [class*="openai"]:
+      // a styling class is far too easy to hit by accident, and claiming a
+      // webview here stops the generic fallback from ever seeing it.
       identify: [
         '[data-testid*="codex" i]',
         '[class*="codex" i]',
@@ -23,19 +28,18 @@
         '[aria-label*="codex" i]',
         '[data-vscode-webview-id*="codex" i]',
         '[data-testid*="openai" i]',
-        '[class*="openai" i]'
+        '[aria-label*="openai" i]'
       ],
       working: [
-        'button[aria-label*="stop" i]',
-        'button[aria-label*="interrupt" i]',
-        'button[aria-label*="cancel" i]',
-        'button[data-testid*="stop" i]',
-        'button[data-testid*="cancel" i]',
-        '[data-state="running"]',
-        '[data-state="streaming"]',
-        '[data-streaming="true"]'
+        ...vocab.selectors.stopButtons,
+        'button[data-testid*="interrupt" i]',
+        ...vocab.selectors.streamingAttrs
       ],
-      busy: ['[aria-busy="true"]'],
+      busy: [
+        '[data-testid*="message" i][aria-busy="true"]',
+        '[class*="chat" i] [aria-busy="true"]',
+        '[role="log"][aria-busy="true"]'
+      ],
       live: [
         '[role="status"]',
         '[aria-live="assertive"]',
@@ -44,14 +48,7 @@
         '[data-testid*="spinner" i]',
         '[class*="spinner" i]'
       ],
-      actionButtons: [
-        '[role="dialog"] button',
-        'button[data-testid*="approve" i]',
-        'button[data-testid*="allow" i]',
-        'button[data-testid*="confirm" i]',
-        '[class*="approval" i] button',
-        "button"
-      ],
+      actionButtons: [...vocab.selectors.approvalButtons],
       errors: [
         '[role="alert"]',
         '[data-testid*="error" i]',
@@ -59,12 +56,20 @@
       ]
     },
     text: {
-      working:
-        /\b(?:codex is (?:working|thinking|running)|running (?:command|tool)|working on it)\b|^(?:thinking|working|reading|searching|analysing|analyzing|generating|writing|creating|planning|editing|running|executing|applying)(?:\b|…|\.\.\.)/i,
-      waiting:
-        /^(?:approve|approve (?:and run|command|patch)|allow(?: once| always| command)?|always allow|accept|accept (?:patch|changes|all)|apply|apply patch|yes|yes,?\s*(?:proceed|continue|run)?|confirm|continue|run(?: anyway| command)?|retry)$/i,
-      error:
-        /\b(?:something went wrong|network error|there was an error|failed to (?:load|respond|generate|send|apply)|connection (?:lost|error)|unexpected error|internal server error|rate limit|request (?:failed|timed out)|not (?:signed in|authenticated)|authentication (?:failed|error)|api error)\b/i
+      working: vocab.workingText({
+        agentNames: ["codex"],
+        extraVerbs: ["applying"]
+      }),
+      waiting: vocab.waitingText({ extra: ["apply patch", "approve patch"] }),
+      error: vocab.errorText({
+        extra: [
+          "rate limit",
+          "not signed in",
+          "not authenticated",
+          "authentication failed"
+        ],
+        extraFailedToVerbs: ["apply"]
+      })
     }
   };
 

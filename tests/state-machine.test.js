@@ -158,6 +158,131 @@ test("waiting for input takes priority over completion", () => {
   assert.equal(clock.pendingCount, 0);
 });
 
+test("waiting on its own is not evidence that work happened", () => {
+  // An over-eager approval selector must not be able to manufacture a green
+  // dot for a conversation in which nothing ever ran.
+  const { machine, current } = createHarness();
+
+  current.state = "waiting";
+  machine.evaluate();
+
+  assert.equal(machine.state, "waiting");
+  assert.equal(machine.observedWork, false);
+});
+
+test("a waiting prompt that disappears without work settles to idle", () => {
+  const { machine, clock, current } = createHarness();
+
+  current.state = "waiting";
+  machine.evaluate();
+
+  current.state = "idle";
+  machine.evaluate();
+  clock.flush();
+
+  assert.equal(machine.state, "idle");
+});
+
+test("an approval prompt between two work phases still finishes green", () => {
+  const { machine, clock, current } = createHarness();
+
+  current.state = "working";
+  machine.evaluate();
+
+  current.state = "waiting";
+  machine.evaluate();
+
+  current.state = "working";
+  machine.evaluate();
+
+  current.state = "idle";
+  machine.evaluate();
+  clock.flush();
+
+  assert.equal(machine.state, "done");
+});
+
+test("shows an error while the detector reports one", () => {
+  const { machine, current } = createHarness();
+
+  current.state = "error";
+  machine.evaluate();
+
+  assert.equal(machine.state, "error");
+});
+
+test("clears an error once the banner goes away", () => {
+  // Red used to be terminal: nothing but a navigation could clear it.
+  const { machine, clock, current } = createHarness();
+
+  current.state = "error";
+  machine.evaluate();
+
+  current.state = "idle";
+  machine.evaluate();
+
+  assert.equal(machine.state, "error");
+  assert.equal(clock.pendingCount, 1);
+
+  clock.flush();
+
+  assert.equal(machine.state, "idle");
+});
+
+test("an error never settles to green, even after earlier work", () => {
+  const { machine, clock, current } = createHarness();
+
+  current.state = "working";
+  machine.evaluate();
+
+  current.state = "error";
+  machine.evaluate();
+
+  current.state = "idle";
+  machine.evaluate();
+  clock.flush();
+
+  assert.equal(machine.state, "idle");
+});
+
+test("retrying after an error goes back to working and can finish green", () => {
+  const { machine, clock, current } = createHarness();
+
+  current.state = "error";
+  machine.evaluate();
+
+  current.state = "idle";
+  machine.evaluate();
+  assert.equal(clock.pendingCount, 1);
+
+  current.state = "working";
+  machine.evaluate();
+
+  assert.equal(clock.pendingCount, 0);
+  assert.equal(machine.state, "working");
+
+  current.state = "idle";
+  machine.evaluate();
+  clock.flush();
+
+  assert.equal(machine.state, "done");
+});
+
+test("an error that reappears before the timer fires stays red", () => {
+  const { machine, clock, current } = createHarness();
+
+  current.state = "error";
+  machine.evaluate();
+
+  current.state = "idle";
+  machine.evaluate();
+
+  current.state = "error";
+  clock.flush();
+
+  assert.equal(machine.state, "error");
+});
+
 test("renders on every evaluation so a clobbered title is restored", () => {
   const { machine, rendered, current } = createHarness();
 

@@ -1,16 +1,15 @@
 /*
- * Runs in the top frame and owns the tab title.
+ * Runs in the top frame and owns the tab title. Thin wiring only - the pipeline
+ * lives in lib/tab-controller.js so it can be tested without a browser.
  *
- * Two modes:
+ * The tab's state is the merge of two sources, either of which may be absent:
  *
- *   local  - chatgpt.com and claude.ai: the agent UI is in this document, so we
- *            detect and render here, exactly as v0.1.x did.
- *   relay  - Codespaces: the agent UI is in a sandboxed webview iframe we cannot
- *            read from here, so state arrives from the service worker and this
- *            script only renders it.
+ *   local  - the agent UI is in this document (chatgpt.com, claude.ai, and the
+ *            Copilot Chat view in the VS Code workbench).
+ *   relay  - the agent UI is in a sandboxed webview iframe we cannot read from
+ *            here, so state arrives from the service worker.
  *
- * The state machine lives here in both modes, so there is exactly one per tab
- * and `observedWork` / the completion debounce behave identically either way.
+ * A Codespace can have both at once, which is why they merge rather than branch.
  */
 (function startTabLights(globalScope) {
   "use strict";
@@ -19,8 +18,12 @@
   const protocol = namespace?.protocol;
   const tabTitleKit = namespace?.tabTitle;
   const stateMachineKit = namespace?.stateMachine;
+  const controllerKit = namespace?.tabController;
+  const kit = namespace?.kit;
+  const watcherKit = namespace?.watcher;
+  const settingsKit = namespace?.settings;
 
-  if (!protocol || !tabTitleKit || !stateMachineKit) {
+  if (!protocol || !tabTitleKit || !stateMachineKit || !controllerKit) {
     return;
   }
 
@@ -28,106 +31,68 @@
     return;
   }
 
-  const detectors = namespace.detectors || {};
-
-  const localDetectorsByHost = {
-    "chatgpt.com": "chatgpt",
-    "chat.openai.com": "chatgpt",
-    "claude.ai": "claude"
-  };
+  // Read lazily: the detector files register themselves into the same
+  // namespace, and depending on manifest ordering they may not all have run
+  // when this file is evaluated.
+  const getDetectors = () => namespace.detectors || {};
 
   const hostname = globalScope.location.hostname.replace(/^www\./, "");
-  const localDetector = detectors[localDetectorsByHost[hostname]] || null;
 
-  // Relay mode. Note this must not bail out the way v0.1.x did when no detector
-  // was present: in Codespaces having no local detector is the normal case.
-  let relayReport = null;
+  // Which detector owns this host comes from the detector profiles themselves.
+  // A separate host table here used to be a fourth place to edit when adding a
+  // provider, and forgetting it failed silently.
+  const localDetector = kit?.findLocalDetector(getDetectors(), hostname) || null;
 
-  let agentName = localDetector?.label || "Agent";
+  let settings = settingsKit?.defaults;
 
-  const renderer = tabTitleKit.createTitleRenderer({
+  const controller = controllerKit.createTabController({
+    protocol,
     document,
-    fallbackTitle: localDetector?.label || "Agent",
-    agentName: () => agentName
+    globalScope,
+    tabTitleKit,
+    stateMachineKit,
+    getDetectors,
+    localDetector,
+    now: () => performance.now(),
+    createWatcher: localDetector ? watcherKit?.createWatcher : null,
+    isProviderEnabled: (detectorId) =>
+      settingsKit ? settingsKit.isEnabled(settings, detectorId) : true,
+    // frame-reporter is only loaded on the hosts that can contain agent panels,
+    // so its presence is what tells this tab whether to expect any.
+    expectsPanels: Boolean(namespace.frameReporter)
   });
 
-  function detect() {
-    if (localDetector) {
-      return localDetector.detect(document);
-    }
+  function applySettings(loaded) {
+    settings = loaded;
 
-    if (!relayReport) {
-      return "idle";
-    }
-
-    // A panel that was closed stops reporting. Treat silence as idle rather
-    // than freezing on whatever it last said.
-    if (performance.now() - relayReport.receivedAt > protocol.staleAfterMs) {
-      return "idle";
-    }
-
-    return relayReport.state;
+    // The two switches are applied separately. The master switch silences the
+    // whole tab; a per-provider switch only removes the local detector from the
+    // merge, because a workbench tab's local detector (Copilot Chat) shares the
+    // tab with relayed panels that have their own toggles.
+    controller.setEnabled(settingsKit.isEnabled(settings, null));
+    controller.refreshProviders();
   }
 
-  function render(state) {
-    renderer.render(state);
-  }
+  settingsKit?.load(applySettings);
+  settingsKit?.subscribe(applySettings);
 
-  const machine = stateMachineKit.createStateMachine({
-    detect,
-    render,
-    getUrl: () => globalScope.location.href
+  // Not {once:true}: a bfcache restore brings the page back and the next
+  // pagehide has to tear down again.
+  globalScope.addEventListener("pagehide", () => controller.dispose());
+
+  // Restored from the back/forward cache: the watcher stopped on pagehide and
+  // nothing would have restarted it.
+  globalScope.addEventListener("pageshow", (event) => {
+    if (event.persisted) {
+      controller.resume();
+    }
   });
 
-  if (localDetector) {
-    const watcher = namespace.watcher.createWatcher({
-      onChange: () => machine.evaluate()
-    });
-
-    watcher.start();
-  } else {
-    chrome.runtime.onMessage.addListener((message) => {
-      if (message?.type !== protocol.messages.tabState) {
-        return;
-      }
-
-      relayReport = {
-        state: message.state,
-        receivedAt: performance.now()
-      };
-
-      if (message.label || message.detectorId) {
-        agentName =
-          message.label ||
-          detectors[message.detectorId]?.label ||
-          message.detectorId;
-      }
-
-      machine.evaluate();
-    });
-
-    // Expires stale reports, drives the completion debounce, and re-applies the
-    // prefix after the workbench rewrites its own title.
-    globalScope.setInterval(() => machine.evaluate(), protocol.heartbeatMs);
-
-    // The workbench rewrites document.title often (dirty editors, active file).
-    // Re-sync immediately rather than waiting for the next interval tick.
-    const titleElement = document.querySelector("title");
-
-    if (titleElement) {
-      // render() only assigns when the value actually differs, so observing the
-      // element we write to cannot loop.
-      new MutationObserver(() => render(machine.state)).observe(titleElement, {
-        childList: true,
-        characterData: true,
-        subtree: true
-      });
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {
+      controller.resume();
     }
+  });
 
-    globalScope.addEventListener("pagehide", () => machine.dispose(), {
-      once: true
-    });
-  }
-
-  machine.evaluate();
+  controller.start();
 })(typeof globalThis !== "undefined" ? globalThis : this);

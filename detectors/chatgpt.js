@@ -4,23 +4,26 @@
   const kit =
     globalScope.AgentTabLights?.kit ||
     (typeof require === "function" ? require("../lib/detector-kit.js") : null);
+  const vocab =
+    globalScope.AgentTabLights?.vocab ||
+    (typeof require === "function" ? require("../lib/vocab.js") : null);
 
-  if (!kit) {
+  if (!kit || !vocab) {
     return;
   }
 
   const profile = {
     id: "chatgpt",
     label: "ChatGPT",
+    hosts: ["chatgpt.com", "chat.openai.com"],
     selectors: {
       working: [
         'button[data-testid="stop-button"]',
-        '[data-testid="stop-button"]',
-        'button[aria-label*="stop generating" i]',
-        'button[aria-label*="stop response" i]',
-        'button[aria-label*="stop streaming" i]',
-        'button[title*="stop generating" i]',
-        '[data-testid*="stop" i][role="button"]'
+        ...vocab.selectors.stopButtons,
+        // Rendered as a div rather than a button, so the DOM `disabled`
+        // property never applies - isActive falls back to aria-disabled.
+        '[data-testid*="stop" i][role="button"]',
+        ...vocab.selectors.streamingAttrs
       ],
       busy: [
         'main[aria-busy="true"]',
@@ -32,22 +35,18 @@
         'main [aria-live="assertive"]',
         'main [aria-live="polite"]'
       ],
-      actionButtons: [
-        '[role="dialog"] button',
-        'main button[data-testid*="approve" i]',
-        'main button[data-testid*="allow" i]',
-        'main button[data-testid*="confirm" i]',
-        "main button"
-      ],
+      // No bare `main button`. ChatGPT renders Retry and "Continue generating"
+      // under finished messages, and matching them made every completed
+      // conversation read as waiting for input.
+      actionButtons: [...vocab.selectors.approvalButtons],
       errors: ['main [role="alert"]', 'main [data-testid*="error" i]']
     },
     text: {
-      working:
-        /\bchatgpt is (?:working|thinking|generating)\b|^(?:working|thinking|running|searching|browsing|analysing|analyzing|generating|writing|reading|creating)(?:\b|…|\.\.\.)/i,
-      waiting:
-        /^(?:approve|allow(?: once| for (?:this|all) sites?)?|confirm|continue(?: generating)?|grant access|reconnect|retry|run anyway|yes,?\s*continue)$/i,
-      error:
-        /\b(?:something went wrong|network error|there was an error|failed to (?:load|respond|generate)|connection lost|unexpected error)\b/i
+      working: vocab.workingText({ agentNames: ["chatgpt"] }),
+      waiting: vocab.waitingText(),
+      error: vocab.errorText({
+        extra: ["rate limit", "too many requests", "overloaded"]
+      })
     }
   };
 

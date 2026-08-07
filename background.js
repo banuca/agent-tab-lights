@@ -7,93 +7,41 @@
  *
  * Holds no durable state on purpose. Chrome idles the worker aggressively, and
  * frames re-report every few seconds, so a restart heals itself.
+ *
+ * The bookkeeping lives in lib/relay-hub.js; this file is only the wiring.
  */
 "use strict";
 
-importScripts("lib/protocol.js");
+importScripts("lib/protocol.js", "lib/relay-hub.js");
 
 const protocol = self.AgentTabLights.protocol;
 
-// tabId -> Map<frameId, { state, detectorId, label, seenAt }>
-const tabs = new Map();
+const hub = self.AgentTabLights.relayHub.createRelayHub({
+  protocol,
+  sendToTab(tabId, message) {
+    chrome.tabs.sendMessage(tabId, message, { frameId: 0 }).catch((error) => {
+      const reason = String(error?.message || error);
 
-function pruneStale(frames) {
-  const cutoff = Date.now() - protocol.staleAfterMs;
-
-  for (const [frameId, report] of frames) {
-    if (report.seenAt < cutoff) {
-      frames.delete(frameId);
-    }
-  }
-}
-
-function publish(tabId) {
-  const frames = tabs.get(tabId);
-
-  if (!frames) {
-    return;
-  }
-
-  pruneStale(frames);
-
-  if (frames.size === 0) {
-    tabs.delete(tabId);
-  }
-
-  const merged = protocol.mergeStates(Array.from(frames.values()));
-
-  chrome.tabs
-    .sendMessage(
-      tabId,
-      {
-        type: protocol.messages.tabState,
-        state: merged.state,
-        detectorId: merged.detectorId,
-        label: merged.label,
-        sources: frames.size
-      },
-      { frameId: 0 }
-    )
-    .catch(() => {
-      // The top frame has no listener yet, or the tab is gone. Frames keep
-      // heartbeating, so the next report retries this anyway.
+      // Expected and frequent: the top frame has not registered its listener
+      // yet, or the tab is gone. Frames keep heartbeating, so the next report
+      // retries. Anything else is worth surfacing rather than swallowing.
+      if (
+        !reason.includes("Could not establish connection") &&
+        !reason.includes("Receiving end does not exist") &&
+        !reason.includes("No tab with id")
+      ) {
+        console.warn("[agent-tab-lights] relay failed:", reason);
+      }
     });
-}
-
-chrome.runtime.onMessage.addListener((message, sender) => {
-  const tabId = sender.tab?.id;
-  const frameId = sender.frameId;
-
-  if (typeof tabId !== "number" || typeof frameId !== "number") {
-    return;
-  }
-
-  if (message?.type === protocol.messages.frameState) {
-    const frames = tabs.get(tabId) || new Map();
-
-    frames.set(frameId, {
-      state: message.state,
-      detectorId: message.detectorId,
-      label: message.label,
-      seenAt: Date.now()
-    });
-
-    tabs.set(tabId, frames);
-    publish(tabId);
-    return;
-  }
-
-  if (message?.type === protocol.messages.frameGone) {
-    const frames = tabs.get(tabId);
-
-    if (frames?.delete(frameId)) {
-      publish(tabId);
-    }
   }
 });
 
+chrome.runtime.onMessage.addListener((message, sender) => {
+  hub.handleMessage(message, sender);
+});
+
 chrome.tabs.onRemoved.addListener((tabId) => {
-  tabs.delete(tabId);
+  hub.forgetTab(tabId);
 });
 
 // A top-level navigation replaces every frame in the tab, so drop the old
@@ -103,6 +51,6 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 // changeInfo.url, so gating on it would mean this never ran.
 chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
   if (changeInfo.status === "loading") {
-    tabs.delete(tabId);
+    hub.forgetTab(tabId);
   }
 });

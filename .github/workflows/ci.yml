@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # `node --test` only accepts glob arguments from 21 onwards; 22 is the
+          # oldest LTS that works, and 24 is what the suite is developed against.
+          node-version: 24
+
+      - name: Run tests
+        run: npm test
+
+      # Also the lint step: package.mjs syntax-checks every shipped file and
+      # verifies the manifest only points at files that are actually packaged.
+      - name: Build the extension package
+        run: npm run package
+
+      # Deliberately not diffed against the committed PNGs: deflate output is
+      # not guaranteed byte-identical across zlib versions, so that check would
+      # go red on a runner image bump rather than on a real problem.
+      - name: Check the icon generator still runs
+        run: npm run icons
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: agent-tab-lights-unpacked
+          path: dist/*.zip

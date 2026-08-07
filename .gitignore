@@ -1,4 +1,5 @@
-*.zip
 node_modules/
+dist/
 *.zip
-*.zip
+.claude/
+.DS_Store

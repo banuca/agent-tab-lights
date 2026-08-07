@@ -8,8 +8,10 @@ const claudeCode = require("../detectors/claude-code.js");
 const codex = require("../detectors/codex.js");
 const generic = require("../detectors/generic-agent.js");
 const claude = require("../detectors/claude.js");
+const chatgpt = require("../detectors/chatgpt.js");
 
 const frameDetectors = [claudeCode, codex, generic];
+const allDetectors = [claudeCode, codex, generic, claude, chatgpt];
 
 // content-frame.js is injected into every webview in the VS Code workbench,
 // including markdown previews and the settings editor. The identify gate is the
@@ -121,13 +123,65 @@ test("Codex reads a patch approval as waiting", () => {
   assert.equal(codex.detect(root), "waiting");
 });
 
-test("the generic fallback refuses to guess at approval prompts", () => {
-  // Without knowing the provider we cannot tell an approval prompt from an
-  // ordinary toolbar control, so a bare button selector must never appear here.
-  assert.ok(
-    !generic.selectors.actionButtons.includes("button"),
-    "the generic detector would treat any button as an approval prompt"
-  );
+test("no detector treats an arbitrary button as an approval prompt", () => {
+  // A bare `button` (or `main button`) here matches every control on the page,
+  // so any label that happens to read like an approval flips the tab yellow.
+  // The generic fallback always got this right; the provider profiles did not.
+  for (const detector of allDetectors) {
+    for (const selector of detector.selectors.actionButtons) {
+      assert.ok(
+        /[[.#]/.test(selector),
+        `${detector.id} matches "${selector}" by tag alone`
+      );
+    }
+  }
+});
+
+test("no detector reads a bare Cancel or Stop label as work in progress", () => {
+  // A panel that also renders dialogs has Cancel buttons everywhere; matching
+  // them pinned the tab orange for as long as a dialog stayed open.
+  for (const detector of allDetectors) {
+    for (const selector of detector.selectors.working) {
+      assert.ok(
+        !/aria-label\*="(?:cancel|stop)" i\]/.test(selector),
+        `${detector.id} treats "${selector}" as a stop control`
+      );
+    }
+  }
+});
+
+test("no detector claims every busy element in its document", () => {
+  // A bare [aria-busy="true"] matches any list or tree that is loading, which
+  // in a VS Code webview is constant.
+  for (const detector of allDetectors) {
+    assert.ok(
+      !detector.selectors.busy.includes('[aria-busy="true"]'),
+      `${detector.id} treats any loading element as agent work`
+    );
+  }
+});
+
+test("frame detectors declare no hosts and host detectors do", () => {
+  // hosts is what the top frame scans to pick a local detector. A panel
+  // detector with hosts would fight the real one; a host detector without them
+  // would silently never run.
+  for (const detector of frameDetectors) {
+    assert.equal(detector.hosts.length, 0, detector.id);
+  }
+
+  for (const detector of [claude, chatgpt]) {
+    assert.ok(detector.hosts.length > 0, detector.id);
+  }
+});
+
+test("a per-message Retry never reads as an approval prompt", () => {
+  for (const detector of allDetectors) {
+    const root = fakeRoot({
+      [detector.selectors.actionButtons[0]]: [fakeElement({ text: "Retry" })]
+    });
+
+    assert.equal(detector.detect(root), "idle", detector.id);
+  }
 });
 
 test("claude.ai streaming marker reads as working", () => {

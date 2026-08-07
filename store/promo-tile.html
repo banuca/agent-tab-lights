@@ -1,0 +1,83 @@
+<!doctype html>
+<!--
+  The 440x280 small promo tile for the Chrome Web Store listing.
+
+  To export: open this file, right-click the card in DevTools and choose
+  "Capture node screenshot". Set the device pixel ratio to 1 first (or halve the
+  result) - at 2x it exports 880x560, which the store rejects.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Agent Tab Lights — promo tile</title>
+    <style>
+      body {
+        display: grid;
+        place-items: center;
+        min-height: 100vh;
+        margin: 0;
+        background: #6b7280;
+        font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+      }
+
+      .tile {
+        display: flex;
+        align-items: center;
+        gap: 30px;
+        width: 440px;
+        height: 280px;
+        padding: 0 34px;
+        background: #1e2430;
+        color: #eef1f6;
+      }
+
+      .mark {
+        display: flex;
+        flex: none;
+        flex-direction: column;
+        gap: 13px;
+        padding: 17px 15px;
+        border-radius: 22px;
+        background: #262d3b;
+      }
+
+      .dot {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+      }
+
+      .dot--working { background: #f4900c; }
+      .dot--waiting { background: #fdcb58; }
+      .dot--done { background: #78b159; }
+
+      .wordmark {
+        margin: 0;
+        font-size: 30px;
+        font-weight: 650;
+        line-height: 1.15;
+        letter-spacing: -0.01em;
+      }
+
+      .tagline {
+        margin: 12px 0 0;
+        color: #99a2b2;
+        font-size: 15px;
+        line-height: 1.4;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="tile">
+      <div class="mark">
+        <span class="dot dot--working"></span>
+        <span class="dot dot--waiting"></span>
+        <span class="dot dot--done"></span>
+      </div>
+      <div>
+        <h1 class="wordmark">Agent Tab<br />Lights</h1>
+        <p class="tagline">Know when your agent is done — from the tab strip.</p>
+      </div>
+    </div>
+  </body>
+</html>

@@ -4,58 +4,59 @@
   const kit =
     globalScope.AgentTabLights?.kit ||
     (typeof require === "function" ? require("../lib/detector-kit.js") : null);
+  const vocab =
+    globalScope.AgentTabLights?.vocab ||
+    (typeof require === "function" ? require("../lib/vocab.js") : null);
 
-  if (!kit) {
+  if (!kit || !vocab) {
     return;
   }
 
   const profile = {
     id: "claude",
     label: "Claude",
+    hosts: ["claude.ai"],
     selectors: {
       working: [
         // data-is-streaming is Claude's own marker on the streaming message
         // container and is the strongest signal available here.
         '[data-is-streaming="true"]',
-        'button[aria-label*="stop response" i]',
-        'button[aria-label*="stop generating" i]',
-        'button[aria-label*="stop streaming" i]',
+        ...vocab.selectors.stopButtons,
         'button[data-testid*="stop" i]',
-        '[data-testid="stop-button"]',
-        'button[title*="stop response" i]'
+        ...vocab.selectors.streamingAttrs
       ],
       busy: [
         'main[aria-busy="true"]',
         'main form[aria-busy="true"]',
         '[data-testid*="chat" i][aria-busy="true"]'
       ],
+      // Scoped to the transcript. Unscoped live regions also picked up the app
+      // shell's global announcements and toasts, which have nothing to do with
+      // whether a response is streaming.
       live: [
-        '[role="status"]',
-        '[aria-live="assertive"]',
-        '[aria-live="polite"]'
+        'main [role="status"]',
+        'main [aria-live="assertive"]',
+        'main [aria-live="polite"]',
+        '[data-testid*="chat" i] [role="status"]'
       ],
-      actionButtons: [
-        '[role="dialog"] button',
-        'button[data-testid*="approve" i]',
-        'button[data-testid*="allow" i]',
-        'button[data-testid*="confirm" i]',
-        'main button'
-      ],
+      actionButtons: [...vocab.selectors.approvalButtons],
       errors: [
-        '[role="alert"]',
+        'main [role="alert"]',
         'main [data-testid*="error" i]',
         '[data-testid*="error-message" i]'
       ]
     },
     text: {
-      // Claude cycles through varied gerunds while working ("Pondering…",
-      // "Researching…"), so match the shape rather than an exhaustive list.
-      working:
-        /\bclaude is (?:working|thinking|writing|researching|responding)\b|^(?:thinking|pondering|working|researching|reading|searching|browsing|analysing|analyzing|generating|writing|creating|planning|reasoning|deciphering|puzzling|considering|reviewing|running|executing)(?:\b|…|\.\.\.)/i,
-      waiting:
-        /^(?:approve|allow(?: once| always| for (?:this|all) (?:chat|chats|sites?))?|always allow|confirm|continue|grant access|keep going|reconnect|resume|retry|run(?: anyway| command| tool)?|yes,?\s*(?:continue|proceed|run)?)$/i,
-      error:
-        /\b(?:something went wrong|network error|there was an error|failed to (?:load|respond|generate|send)|connection (?:lost|error)|unexpected error|internal server error|overloaded|response was interrupted|message limit reached|conversation is too long)\b/i
+      working: vocab.workingText({ agentNames: ["claude"] }),
+      waiting: vocab.waitingText(),
+      error: vocab.errorText({
+        extra: [
+          "overloaded",
+          "response was interrupted",
+          "message limit reached",
+          "conversation is too long"
+        ]
+      })
     }
   };
 

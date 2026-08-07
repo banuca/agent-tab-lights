@@ -131,3 +131,28 @@ test("treats an unknown state as idle rather than throwing", () => {
 
   assert.equal(doc.title, "ChatGPT");
 });
+
+test("clear removes the prefix and the styling hooks", () => {
+  // What "turn it off" has to do on a tab that is already open.
+  const doc = createFakeDocument("🟠 ChatGPT");
+  const root = createFakeRoot();
+  const renderer = createTitleRenderer({ document: doc, root });
+
+  renderer.render("working");
+  assert.ok(root.dataset.agentTabLightsState);
+
+  renderer.clear();
+
+  assert.equal(doc.title, "ChatGPT");
+  assert.equal(root.dataset.agentTabLightsState, undefined);
+  assert.equal(root.dataset.agentTabLightsLabel, undefined);
+});
+
+test("clear does not write a title that is already bare", () => {
+  const doc = createFakeDocument("ChatGPT");
+  const renderer = createTitleRenderer({ document: doc, root: createFakeRoot() });
+
+  renderer.clear();
+
+  assert.equal(doc.writes, 0);
+});

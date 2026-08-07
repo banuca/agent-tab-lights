@@ -4,16 +4,18 @@
   const kit =
     globalScope.AgentTabLights?.kit ||
     (typeof require === "function" ? require("../lib/detector-kit.js") : null);
+  const vocab =
+    globalScope.AgentTabLights?.vocab ||
+    (typeof require === "function" ? require("../lib/vocab.js") : null);
 
-  if (!kit) {
+  if (!kit || !vocab) {
     return;
   }
 
   // Last-resort fallback for an agent panel whose markup we have not pinned
-  // down, or that changed under us. It is deliberately narrower than the
-  // provider detectors: it runs in webviews we have not identified, so a false
-  // positive here means a random VS Code panel turns the tab orange. When in
-  // doubt this returns idle and the provider detectors do the real work.
+  // down, or that changed under us. It runs in webviews we have not identified,
+  // so a false positive here means a random VS Code panel turns the tab orange.
+  // When in doubt this returns idle and the provider detectors do the real work.
   const profile = {
     id: "generic-agent",
     label: "Agent",
@@ -29,36 +31,21 @@
         '[class*="composer" i]'
       ],
       working: [
-        'button[aria-label*="stop generating" i]',
-        'button[aria-label*="stop response" i]',
-        'button[aria-label*="stop streaming" i]',
-        'button[aria-label*="interrupt" i]',
-        '[data-testid*="stop-button" i]',
-        '[data-state="streaming"]',
-        '[data-streaming="true"]',
-        '[data-is-streaming="true"]'
+        ...vocab.selectors.stopButtons,
+        ...vocab.selectors.streamingAttrs
       ],
-      busy: ['[aria-busy="true"]'],
+      busy: [
+        '[role="log"][aria-busy="true"]',
+        '[data-testid*="chat" i] [aria-busy="true"]'
+      ],
       live: ['[role="status"]', '[aria-live="assertive"]'],
-      // No bare `button` here on purpose. Without knowing the provider we
-      // cannot tell an approval prompt from an ordinary toolbar control, so we
-      // only trust explicitly marked-up prompts.
-      actionButtons: [
-        '[role="dialog"] button',
-        '[role="alertdialog"] button',
-        'button[data-testid*="approve" i]',
-        'button[data-testid*="allow" i]',
-        'button[data-testid*="permission" i]'
-      ],
+      actionButtons: [...vocab.selectors.approvalButtons],
       errors: ['[role="alert"]']
     },
     text: {
-      working:
-        /\b(?:esc to interrupt|is (?:working|thinking|generating|responding))\b|^(?:thinking|working|generating|running|executing|searching|analysing|analyzing)(?:\b|…|\.\.\.)/i,
-      waiting:
-        /^(?:approve|allow(?: once| always)?|always allow|accept|confirm|yes|yes,?\s*(?:continue|proceed|run)?|run(?: anyway| command)?)$/i,
-      error:
-        /\b(?:something went wrong|network error|there was an error|failed to (?:load|respond|generate|send)|connection (?:lost|error)|unexpected error|internal server error|request (?:failed|timed out))\b/i
+      working: vocab.workingText({ extraPhrases: ["esc to interrupt"] }),
+      waiting: vocab.waitingText(),
+      error: vocab.errorText()
     }
   };
 

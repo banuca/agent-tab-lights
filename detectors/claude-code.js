@@ -4,8 +4,11 @@
   const kit =
     globalScope.AgentTabLights?.kit ||
     (typeof require === "function" ? require("../lib/detector-kit.js") : null);
+  const vocab =
+    globalScope.AgentTabLights?.vocab ||
+    (typeof require === "function" ? require("../lib/vocab.js") : null);
 
-  if (!kit) {
+  if (!kit || !vocab) {
     return;
   }
 
@@ -26,21 +29,18 @@
         '[aria-label*="claude" i]',
         '[data-vscode-webview-id*="claude" i]'
       ],
+      // No bare aria-label*="cancel"/"stop": in a panel that also renders
+      // dialogs and forms, an ordinary Cancel button would pin the tab orange
+      // for as long as the dialog stayed open.
       working: [
-        'button[aria-label*="stop" i]',
-        'button[aria-label*="interrupt" i]',
-        'button[aria-label*="cancel" i]',
-        'button[data-testid*="stop" i]',
+        ...vocab.selectors.stopButtons,
         'button[data-testid*="interrupt" i]',
-        '[data-testid*="stop-button" i]',
-        '[data-streaming="true"]',
-        '[data-is-streaming="true"]',
-        '[data-state="streaming"]',
-        '[data-state="running"]'
+        ...vocab.selectors.streamingAttrs
       ],
       busy: [
-        '[aria-busy="true"]',
-        '[data-testid*="message" i][aria-busy="true"]'
+        '[data-testid*="message" i][aria-busy="true"]',
+        '[class*="chat" i] [aria-busy="true"]',
+        '[role="log"][aria-busy="true"]'
       ],
       live: [
         '[role="status"]',
@@ -51,17 +51,7 @@
         '[class*="spinner" i]',
         '[class*="thinking" i]'
       ],
-      actionButtons: [
-        '[role="dialog"] button',
-        'button[data-testid*="approve" i]',
-        'button[data-testid*="allow" i]',
-        'button[data-testid*="permission" i]',
-        'button[data-testid*="confirm" i]',
-        'button[data-testid*="accept" i]',
-        '[class*="permission" i] button',
-        '[class*="approval" i] button',
-        "button"
-      ],
+      actionButtons: [...vocab.selectors.approvalButtons],
       errors: [
         '[role="alert"]',
         '[data-testid*="error" i]',
@@ -71,12 +61,21 @@
     text: {
       // "esc to interrupt" is Claude Code's own hint that a turn is in flight,
       // which makes it a reliable working signal in both panel and CLI styling.
-      working:
-        /\b(?:esc to interrupt|claude is (?:working|thinking|writing|running)|running (?:tool|command)|tool (?:running|in progress))\b|^(?:thinking|pondering|working|researching|reading|searching|analysing|analyzing|generating|writing|creating|planning|reasoning|editing|running|executing|compacting)(?:\b|…|\.\.\.)/i,
-      waiting:
-        /^(?:approve|approve(?: plan| and run| edits?)?|accept|accept (?:plan|edits?|all)|allow(?: once| always| all(?: edits?)?)?|always allow|yes|yes,?\s*(?:allow all|and don'?t ask again|proceed|continue|run)?|confirm|continue|keep planning|run(?: anyway| command| tool)?|retry|resume)$/i,
-      error:
-        /\b(?:something went wrong|network error|there was an error|failed to (?:load|respond|generate|send|apply)|connection (?:lost|error)|unexpected error|internal server error|overloaded|request (?:failed|timed out)|not authenticated|authentication (?:failed|error)|session expired|api error)\b/i
+      working: vocab.workingText({
+        agentNames: ["claude"],
+        extraVerbs: ["compacting"],
+        extraPhrases: ["esc to interrupt"]
+      }),
+      waiting: vocab.waitingText({ extra: ["keep planning"] }),
+      error: vocab.errorText({
+        extra: [
+          "overloaded",
+          "not authenticated",
+          "authentication failed",
+          "session expired"
+        ],
+        extraFailedToVerbs: ["apply"]
+      })
     }
   };
 
